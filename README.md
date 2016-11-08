@@ -164,9 +164,9 @@ Role Variables
       service_cluster_ip_range: 100.64.0.0/12
       flannel_network_config: "{ \"Network\": \"172.24.0.0/13\", \"Backend\": { \"Type\": \"vxlan\", \"VNI\": 1 } }"
       flannel_etcd_prefix: /coreos.com/network
-      kubernetes_ca_crt_CN: anynode.com
+      kubernetes_ca_crt_CN: swqmaven.com
       kubernetes_cluster_default_token: 1MVytSxl5f2X05fjnZGmvFiXkixYQUgq
-      kubernetes_cluster_default_user: kubeadm
+      kubernetes_cluster_default_user: swqmaven
       kubernetes_cluster_default_uid: 000c2968d923
       kubernetes_cluster_default_group: system:kubelet-bootstrap
       cluster_dns: 100.64.0.10
