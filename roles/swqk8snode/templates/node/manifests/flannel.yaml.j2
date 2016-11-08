@@ -1,0 +1,29 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: flannel-daemon
+  labels:
+    name: flannel-daemon
+    version: "0.6.2"
+  namespace: kube-system
+spec:
+  containers:
+  - name: flannel-daemon
+    image: {{flannel_image_name}}
+    securityContext:
+      privileged: true
+    command:
+    - /opt/bin/flanneld
+    args:
+    - --etcd-endpoints={{etcd_servers}}
+    - --etcd-prefix={{flannel_etcd_prefix}}
+    - --subnet-file={{node_work_root_path}}/kubernetes/run/subnet.env
+    - --iface={{inventory_hostname}}
+    volumeMounts:
+    - mountPath: {{node_work_root_path}}/kubernetes/run
+      name: volume1
+  hostNetwork: true
+  volumes:
+  - hostPath:
+      path: {{node_work_root_path}}/kubernetes/run
+    name: volume1

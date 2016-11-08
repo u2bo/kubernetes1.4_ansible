@@ -1,0 +1,24 @@
+apiVersion: v1
+clusters:
+- cluster:
+    insecure-skip-tls-verify: true
+    #certificate-authority: {{node_work_root_path}}/kubernetes/pki/ca.crt
+    #certificate-authority-data: cat {{node_work_root_path}}/kubernetes/pki/ca.crt | base64
+    server: {{kubernetes_master_url_tls}}
+  name: kubernetes_tls
+contexts:
+- context:
+    cluster: kubernetes_tls
+    user: {{kubernetes_cluster_default_user}}
+  name: swq@kubernetes
+current-context: swq@kubernetes
+kind: Config
+preferences: {}
+users:
+- name: {{kubernetes_cluster_default_user}}
+  user:
+    token: {{kubernetes_cluster_default_token}}
+- name: {{kubernetes_cluster_default_user}}2
+  user:
+    client-certificate: {{node_work_root_path}}/kubernetes/pki/server.crt
+    client-key: {{node_work_root_path}}/kubernetes/pki/server.key

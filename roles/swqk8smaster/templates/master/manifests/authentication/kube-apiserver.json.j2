@@ -1,0 +1,78 @@
+{
+  "kind": "Pod",
+  "apiVersion": "v1",
+  "metadata": {
+    "name": "kube-apiserver",
+    "namespace": "kube-system",
+    "creationTimestamp": null,
+    "labels": {
+      "component": "kube-apiserver",
+      "tier": "control-plane"
+    }
+  },
+  "spec": {
+    "volumes": [
+      {
+        "name": "certs",
+        "hostPath": {
+          "path": "/etc/ssl/certs"
+        }
+      },
+      {
+        "name": "pki",
+        "hostPath": {
+          "path": "{{node_work_root_path}}/kubernetes"
+        }
+      }
+    ],
+    "containers": [
+      {
+        "name": "kube-apiserver",
+        "image": "{{kube_apiserver_image_name}}",
+        "command": [
+          "/usr/local/bin/kube-apiserver",
+          "--v=4",
+          "--port=8080",
+          "--insecure-bind-address=0.0.0.0",
+          "--etcd-servers=http://127.0.0.1:2379",
+          "--admission-control=NamespaceLifecycle,LimitRanger,ServiceAccount,PersistentVolumeLabel,DefaultStorageClass,ResourceQuota",
+          "--service-cluster-ip-range={{service_cluster_ip_range}}",
+          "--service-account-key-file={{node_work_root_path}}/kubernetes/pki/server.key",
+          "--client-ca-file={{node_work_root_path}}/kubernetes/pki/ca.crt",
+          "--tls-cert-file={{node_work_root_path}}/kubernetes/pki/server.crt",
+          "--tls-private-key-file={{node_work_root_path}}/kubernetes/pki/server.key",
+          "--token-auth-file={{node_work_root_path}}/kubernetes/pki/tokens.csv",
+          "--secure-port=443",
+          "--allow-privileged"
+        ],
+        "resources": {
+          "requests": {
+            "cpu": "250m"
+          }
+        },
+        "volumeMounts": [
+          {
+            "name": "certs",
+            "mountPath": "/etc/ssl/certs"
+          },
+          {
+            "name": "pki",
+            "readOnly": true,
+            "mountPath": "{{node_work_root_path}}/kubernetes/"
+          }
+        ],
+        "livenessProbe": {
+          "httpGet": {
+            "path": "/healthz",
+            "port": 8080,
+            "host": "127.0.0.1"
+          },
+          "initialDelaySeconds": 15,
+          "timeoutSeconds": 15
+        }
+      }
+    ],
+    "hostNetwork": true
+  },
+  "status": {}
+}

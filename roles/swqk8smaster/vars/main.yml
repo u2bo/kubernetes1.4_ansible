@@ -1,0 +1,37 @@
+---
+# vars file for swqk8smaster
+
+node_work_root_path: /usr/local/swqmaven
+pip_extra_args:  -i http://pypi.douban.com/simple --trusted-host pypi.douban.com
+#used images
+IMAGE_TAR: ['pause-amd64.tar','kube-proxy.tar','flannel.tar','kube-apiserver.tar','kube-controller-manager.tar','kube-scheduler.tar','kubedns-amd64.tar','kube-dnsmasq-amd64.tar','exechealthz-amd64.tar','etcd-amd64.tar','kubernetes-dashboard.tar']
+etcd_image_name: gcr.io/google_containers/etcd-amd64:2.2.5
+kube_apiserver_image_name: gcr.io/google_containers/kube-apiserver-amd64:v1.4.1
+kube_controller_manager_image_name: gcr.io/google_containers/kube-controller-manager-amd64:v1.4.1
+kube_scheduler_image_name: gcr.io/google_containers/kube-scheduler-amd64:v1.4.1
+kube_proxy_image_name: gcr.io/google_containers/kube-proxy-amd64:v1.4.1
+flannel_image_name: quay.io/coreos/flannel:v0.6.2-amd64
+kubedens_image_name: gcr.io/google_containers/kubedns-amd64:1.8
+dnsmasq_image_name: gcr.io/google_containers/kube-dnsmasq-amd64:1.4
+exechealthz_image_name: gcr.io/google_containers/exechealthz-amd64:1.2
+kubernetes_dashboard_image_name: gcr.io/google_containers/kubernetes-dashboard-amd64:v1.4.0
+
+
+
+#used configs
+cluster_name: kubernetes
+etcd_servers: http://127.0.0.1:2379
+kubernetes_master_url: http://127.0.0.1:8080
+kubernetes_master_url_tls: https://127.0.0.1:443
+kubernetes_master_ip: 127.0.0.1:8080
+service_cluster_ip_range: 100.64.0.0/12
+flannel_network_config: "{ \"Network\": \"172.24.0.0/13\", \"Backend\": { \"Type\": \"vxlan\", \"VNI\": 1 } }"
+flannel_etcd_prefix: /coreos.com/network
+kubernetes_ca_crt_CN: swqmaven.com
+kubernetes_cluster_default_token: 1MVytSxl5f2X05fjnZGmvFiXkixYQUgq
+kubernetes_cluster_default_user: kubeadm
+kubernetes_cluster_default_uid: ddfa524e-8eac-11e6-aad4-000c2968d923
+kubernetes_cluster_default_group: system:kubelet-bootstrap
+cluster_dns: 100.64.0.10
+cluster_domain: cluster.local
+hostname_override:

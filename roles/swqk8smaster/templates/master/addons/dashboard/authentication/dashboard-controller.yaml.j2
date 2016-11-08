@@ -1,0 +1,52 @@
+apiVersion: v1
+kind: ReplicationController
+metadata:
+  # Keep this file in sync with addons/dashboard/dashboard-controller.yaml
+  name: kubernetes-dashboard-v1.4.0
+  namespace: kube-system
+  labels:
+    k8s-app: kubernetes-dashboard
+    version: v1.4.0
+    kubernetes.io/cluster-service: "true"
+spec:
+  replicas: 1
+  selector:
+    k8s-app: kubernetes-dashboard
+  template:
+    metadata:
+      labels:
+        k8s-app: kubernetes-dashboard
+        version: v1.4.0
+        kubernetes.io/cluster-service: "true"
+    spec:
+      volumes:
+        - hostPath:
+            path: {{node_work_root_path}}/kubernetes
+          name: config
+      containers:
+      - name: kubernetes-dashboard
+        image: {{kubernetes_dashboard_image_name}}
+        resources:
+          # keep request = limit to keep this container in guaranteed class
+          limits:
+            cpu: 100m
+            memory: 50Mi
+          requests:
+            cpu: 100m
+            memory: 50Mi
+        ports:
+        - containerPort: 9090
+        args:
+        - --apiserver-host={{kubernetes_master_url_tls}}
+        volumeMounts:
+        - mountPath: {{node_work_root_path}}/kubernetes
+          name: config
+        env:
+        - name: KUBECONFIG
+          value: {{node_work_root_path}}/kubernetes/config/kubelet.conf
+        livenessProbe:
+          httpGet:
+            path: /
+            port: 9090
+          initialDelaySeconds: 30
+          timeoutSeconds: 30

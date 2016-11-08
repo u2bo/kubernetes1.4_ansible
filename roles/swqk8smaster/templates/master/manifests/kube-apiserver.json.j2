@@ -1,0 +1,72 @@
+{
+  "kind": "Pod",
+  "apiVersion": "v1",
+  "metadata": {
+    "name": "kube-apiserver",
+    "namespace": "kube-system",
+    "creationTimestamp": null,
+    "labels": {
+      "component": "kube-apiserver",
+      "tier": "control-plane"
+    }
+  },
+  "spec": {
+    "volumes": [
+      {
+        "name": "certs",
+        "hostPath": {
+          "path": "/etc/ssl/certs"
+        }
+      },
+      {
+        "name": "pki",
+        "hostPath": {
+          "path": "/etc/kubernetes"
+        }
+      }
+    ],
+    "containers": [
+      {
+        "name": "kube-apiserver",
+        "image": "{{kube_apiserver_image_name}}",
+        "command": [
+          "/usr/local/bin/kube-apiserver",
+          "--v=4",
+          "--port=8080",
+          "--insecure-bind-address=0.0.0.0",
+          "--etcd-servers=http://127.0.0.1:2379",
+          "--admission-control=NamespaceLifecycle,LimitRanger,PersistentVolumeLabel,DefaultStorageClass,ResourceQuota",
+          "--service-cluster-ip-range={{service_cluster_ip_range}}",
+          "--allow-privileged"
+        ],
+        "resources": {
+          "requests": {
+            "cpu": "250m"
+          }
+        },
+        "volumeMounts": [
+          {
+            "name": "certs",
+            "mountPath": "/etc/ssl/certs"
+          },
+          {
+            "name": "pki",
+            "readOnly": true,
+            "mountPath": "/etc/kubernetes/"
+          }
+        ],
+        "livenessProbe": {
+          "httpGet": {
+            "path": "/healthz",
+            "port": 8080,
+            "host": "127.0.0.1"
+          },
+          "initialDelaySeconds": 15,
+          "timeoutSeconds": 15
+        }
+      }
+    ],
+    "hostNetwork": true
+  },
+  "status": {}
+}

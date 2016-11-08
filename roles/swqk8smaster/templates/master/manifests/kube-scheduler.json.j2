@@ -1,0 +1,44 @@
+{
+  "kind": "Pod",
+  "apiVersion": "v1",
+  "metadata": {
+    "name": "kube-scheduler",
+    "namespace": "kube-system",
+    "creationTimestamp": null,
+    "labels": {
+      "component": "kube-scheduler",
+      "tier": "control-plane"
+    }
+  },
+  "spec": {
+    "containers": [
+      {
+        "name": "kube-scheduler",
+        "image": "{{kube_scheduler_image_name}}",
+        "command": [
+          "/usr/local/bin/kube-scheduler",
+          "--v=4",
+          "--address=127.0.0.1",
+          "--leader-elect",
+          "--master={{kubernetes_master_ip}}"
+        ],
+        "resources": {
+          "requests": {
+            "cpu": "100m"
+          }
+        },
+        "livenessProbe": {
+          "httpGet": {
+            "path": "/healthz",
+            "port": 10251,
+            "host": "127.0.0.1"
+          },
+          "initialDelaySeconds": 15,
+          "timeoutSeconds": 15
+        }
+      }
+    ],
+    "hostNetwork": true
+  },
+  "status": {}
+}

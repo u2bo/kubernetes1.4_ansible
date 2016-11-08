@@ -1,0 +1,167 @@
+---
+- name: "Ingore error disabled firewalld for RedHat"
+  service: name=firewalld state=stopped enabled=no
+  ignore_errors: True
+
+- name: "Create kubernetes dirs"
+  file: path={{node_work_root_path}}/kubernetes/{{item}}/ state=directory
+  with_items:
+   - config
+   - images
+   - manifests
+   - run
+   - supervisor
+
+# check docker
+- name: "Ignore error check whether docker exists"
+  shell: command -v docker
+  ignore_errors: True
+  register: result
+  changed_when: false
+  always_run: yes
+
+- name: "Ignore error check whether pip exists"
+  shell: command pip --version
+  ignore_errors: True
+  register: result_pip
+  changed_when: false
+  always_run: yes
+
+- name: Copy python lib
+  unarchive: src={{item}} dest={{node_work_root_path}}/ owner=root group=root mode=777 copy=yes
+  with_items:
+   - "./lib/pip-8.1.2.tar.gz"
+   - "./lib/setuptools-28.6.0.tar.gz"
+  when: result_pip | failed
+
+- name: Install setuptools
+  shell: cd {{node_work_root_path}}/setuptools-28.6.0 && python setup.py install
+  when: result_pip | failed
+
+- name: Install pip
+  shell: cd {{node_work_root_path}}/pip-8.1.2 && python setup.py install
+  when: result_pip | failed
+
+
+- name: "Install docker py supervisor"
+  pip:
+    name: docker-py
+    state: present
+    executable: pip
+    extra_args: "{{ pip_extra_args }}"
+  with_items:
+   - docker-py
+
+- name: "Confirm supervisor was installed for RedHat"
+  yum: name=supervisor state=latest
+
+- name: "Confirm supervisor was started on boot"
+  service: name=supervisord state=started enabled=yes
+
+
+- name: Copy k8s cni network plugin
+  copy: src=./cni/bin/ dest={{node_work_root_path}}/kubernetes/cni/bin owner=root group=root mode=0655
+
+# TODO it's for temp used
+- name: "Copy required image"
+  copy: src=./images/{{item}} dest={{node_work_root_path}}/kubernetes/images/{{item}} owner=root group=root mode=0655
+  with_items: "{{IMAGE_TAR}}"
+
+
+# config kubelet supervisor
+- name: "Config kubelet supervisor file"
+  template: src=./node/supervisor/kubelet.conf.j2 dest={{node_work_root_path}}/kubernetes/supervisor/kubelet.conf owner=root mode=777 backup=no
+
+- name: "Add kubelet supervisor config to default for CentOS"
+  ini_file:  dest=/etc/supervisord.conf section=include option=files value={{node_work_root_path}}/kubernetes/supervisor/*.conf
+
+- include: 'docker_centos_install.yml'
+  when: result | failed
+
+- name: "Confirm docker is started"
+  service: name=docker state=started
+
+# TODO it's for temp used
+- name: "Load docker images"
+  shell: docker load -i {{node_work_root_path}}/kubernetes/images/{{item}}
+  with_items: "{{IMAGE_TAR}}"
+
+- name: "Pulling flannel image"
+  docker_image:
+    name: "{{flannel_image_name}}"
+
+- name: "Pulling kube-proxy image"
+  docker_image:
+    name: "{{kube_proxy_image_name}}"
+
+- name: "Starting kubernetes node"
+  shell: echo "Starting kubernetes node"
+
+- name: "Create kubelet dir if not exists"
+  file: path={{node_work_root_path}}/kubernetes state=directory
+
+- name: "Copy kubelet file"
+  copy: src=kubelet dest={{node_work_root_path}}/kubernetes/kubelet owner=root group=root mode=0655
+
+- name: "Config kubelet"
+  shell: echo "Config kubelet"
+
+- name: "Config kubelet config file"
+  template: src=./node/config/authentication/kubelet.conf.j2 dest={{node_work_root_path}}/kubernetes/config/kubelet.conf owner=root mode=777 backup=no
+
+- name: "Config kubelet manifests"
+  template: src=./node/manifests/authentication/{{item.name}} dest={{node_work_root_path}}/kubernetes/manifests/{{item.value}} owner=root mode=777 backup=no
+  with_items:
+   - {name: "kube-proxy.json.j2", value: "kube-proxy.json"}
+   - {name: "flannel.yaml.j2", value: "flannel.yaml"}
+
+- name: "Ignore error check kubelet is running"
+  shell: ps aux |grep kubelet |grep -v grep
+  ignore_errors: yes
+  changed_when: false
+  register: kubelet_service
+
+- name: "Kill kubelet if already running"
+  shell: kill -9 $(ps aux |grep kubelet |grep -v grep | awk '{print $2}')
+  when: kubelet_service | success
+
+- name: "Config supervisorctl"
+  shell: "{{item}}"
+  with_items:
+   - "sudo touch /var/run/supervisor/supervisor.sock"
+   - "sudo chmod 777 /var/run/supervisor/supervisor.sock"
+
+
+- name: "Restart supervisorctl and auto start kubelet"
+  supervisorctl: name=kubelet state=restarted
+
+- name: "Waitting kubelet 30 seconds..."
+  shell: sleep 30
+
+- name: "Remove if exit docker network"
+  shell: "{{item}}"
+  with_items:
+   - "ip link delete flannel.1"
+   - "ip link delete docker0"
+  ignore_errors: True
+
+- name: "Config flannel docker ops"
+  shell: docker run --rm --net=host --privileged -v {{node_work_root_path}}/kubernetes/run:{{node_work_root_path}}/kubernetes/run {{flannel_image_name}} /opt/bin/mk-docker-opts.sh -f {{node_work_root_path}}/kubernetes/run/subnet.env -d {{node_work_root_path}}/kubernetes/run/docker_opts.env
+
+
+- name: "Config docker ops for centos"
+  shell: "{{item.sed}}"
+  with_items:
+   - {dockerversion: ">12?",sed: "sed -i '/^ExecStart=\\/usr\\/bin\\/dockerd/i\\EnvironmentFile={{node_work_root_path}}\\/kubernetes\\/run\\/docker_opts.env' /usr/lib/systemd/system/docker.service"}
+   - {dockerversion: "<12",sed: "sed -i '/^ExecStart=\\/usr\\/bin\\/docker daemon/i\\EnvironmentFile={{node_work_root_path}}\\/kubernetes\\/run\\/docker_opts.env' /usr/lib/systemd/system/docker.service"}
+   - {dockerversion: "<12",sed: "sed -i 's/ExecStart=\\/usr\\/bin\\/docker daemon/ExecStart=\\/usr\\/bin\\/docker daemon $DOCKER_OPTS/g' /usr/lib/systemd/system/docker.service"}
+   - {dockerversion: ">12?",sed: "sed -i 's/ExecStart=\\/usr\\/bin\\/dockerd/ExecStart=\\/usr\\/bin\\/dockerd $DOCKER_OPTS/g' /usr/lib/systemd/system/docker.service"}
+
+- name: "Reload docker daemon"
+  shell: "systemctl daemon-reload"
+
+- name: "Restart docker service"
+  service: name=docker state=restarted
+
+- name: "Done"
+  debug: msg="Done"

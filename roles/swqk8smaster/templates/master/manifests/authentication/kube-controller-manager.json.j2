@@ -1,0 +1,65 @@
+{
+  "kind": "Pod",
+  "apiVersion": "v1",
+  "metadata": {
+    "name": "kube-controller-manager",
+    "namespace": "kube-system",
+    "creationTimestamp": null,
+    "labels": {
+      "component": "kube-controller-manager",
+      "tier": "control-plane"
+    }
+  },
+  "spec": {
+    "volumes": [
+      {
+        "name": "pki",
+        "hostPath": {
+          "path": "{{node_work_root_path}}/kubernetes"
+        }
+      }
+    ],
+    "containers": [
+      {
+        "name": "kube-controller-manager",
+        "image": "{{kube_controller_manager_image_name}}",
+        "command": [
+          "/usr/local/bin/kube-controller-manager",
+          "--v=4",
+          "--address=127.0.0.1",
+          "--leader-elect",
+          "--master={{kubernetes_master_ip}}",
+          "--cluster-name={{cluster_name}}",
+          "--root-ca-file={{node_work_root_path}}/kubernetes/pki/ca.crt",
+          "--service-account-private-key-file={{node_work_root_path}}/kubernetes/pki/server.key",
+          "--cluster-signing-cert-file={{node_work_root_path}}/kubernetes/pki/ca.crt",
+          "--cluster-signing-key-file={{node_work_root_path}}/kubernetes/pki/ca.key",
+          "--insecure-experimental-approve-all-kubelet-csrs-for-group=system:kubelet-bootstrap"
+        ],
+        "resources": {
+          "requests": {
+            "cpu": "200m"
+          }
+        },
+        "volumeMounts": [
+          {
+            "name": "pki",
+            "readOnly": true,
+            "mountPath": "{{node_work_root_path}}/kubernetes/"
+          }
+        ],
+        "livenessProbe": {
+          "httpGet": {
+            "path": "/healthz",
+            "port": 10252,
+            "host": "127.0.0.1"
+          },
+          "initialDelaySeconds": 15,
+          "timeoutSeconds": 15
+        }
+      }
+    ],
+    "hostNetwork": true
+  },
+  "status": {}
+}

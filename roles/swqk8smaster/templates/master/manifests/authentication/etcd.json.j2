@@ -1,0 +1,83 @@
+{
+  "kind": "Pod",
+  "apiVersion": "v1",
+  "metadata": {
+    "name": "etcd",
+    "namespace": "kube-system",
+    "creationTimestamp": null,
+    "labels": {
+      "component": "etcd",
+      "tier": "control-plane"
+    }
+  },
+  "spec": {
+    "volumes": [
+      {
+        "name": "certs",
+        "hostPath": {
+          "path": "/etc/ssl/certs"
+        }
+      },
+      {
+        "name": "etcd",
+        "hostPath": {
+          "path": "/var/lib/etcd"
+        }
+      },
+      {
+        "name": "pki",
+        "hostPath": {
+          "path": "/etc/kubernetes"
+        }
+      }
+    ],
+    "containers": [
+      {
+        "name": "etcd",
+        "image": "{{etcd_image_name}}",
+        "command": [
+          "etcd",
+          "--listen-client-urls=http://0.0.0.0:2379",
+          "--advertise-client-urls=http://0.0.0.0:2379",
+          "--data-dir=/var/etcd/data"
+        ],
+        "resources": {
+          "requests": {
+            "cpu": "200m"
+          }
+        },
+        "volumeMounts": [
+          {
+            "name": "certs",
+            "mountPath": "/etc/ssl/certs"
+          },
+          {
+            "name": "etcd",
+            "mountPath": "/var/etcd"
+          },
+          {
+            "name": "pki",
+            "readOnly": true,
+            "mountPath": "/etc/kubernetes/"
+          }
+        ],
+        "livenessProbe": {
+          "httpGet": {
+            "path": "/health",
+            "port": 2379,
+            "host": "127.0.0.1"
+          },
+          "initialDelaySeconds": 15,
+          "timeoutSeconds": 15
+        },
+        "securityContext": {
+          "seLinuxOptions": {
+            "type": "unconfined_t"
+          }
+        }
+      }
+    ],
+    "hostNetwork": true
+  },
+  "status": {}
+}

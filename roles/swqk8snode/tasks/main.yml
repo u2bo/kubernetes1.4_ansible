@@ -1,0 +1,9 @@
+---
+# tasks file for swqk8snode
+- name: CentOS install
+  include: centos_install.yml
+  when: ansible_distribution == 'CentOS'
+
+- name: Ubuntu install
+  include: ubuntu_install.yml
+  when: ansible_distribution == 'Ubuntu'

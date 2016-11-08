@@ -1,0 +1,237 @@
+---
+- name: "Create kubernetes dirs"
+  file: path={{node_work_root_path}}/kubernetes/{{item}}/ state=directory
+  with_items:
+   - config
+   - images
+   - manifests
+   - "addons/dns"
+   - "addons/dashboard"
+   - supervisor
+   - run
+   - pki
+   - "addons/calico"
+
+# check docker
+- name: "Ignore error check whether docker exists"
+  shell: command -v docker
+  ignore_errors: True
+  register: result
+  changed_when: false
+  always_run: yes
+
+- name: "Ignore error check whether pip exists"
+  shell: command pip --version
+  ignore_errors: True
+  register: result_pip
+  changed_when: false
+  always_run: yes
+
+- name: Copy python lib
+  unarchive: src={{item}} dest={{node_work_root_path}}/ owner=root group=root mode=777 copy=yes
+  with_items:
+   - "./lib/pip-8.1.2.tar.gz"
+   - "./lib/setuptools-28.6.0.tar.gz"
+  when: result_pip | failed
+
+- name: Install setuptools
+  shell: cd {{node_work_root_path}}/setuptools-28.6.0 && python setup.py install
+  when: result_pip | failed
+
+- name: Install pip
+  shell: cd {{node_work_root_path}}/pip-8.1.2 && python setup.py install
+  when: result_pip | failed
+
+- name: "Remove get pip file"
+  file: path={{item}} state=absent
+  with_items:
+   - "{{node_work_root_path}}/setuptools-28.6.0"
+   - "{{node_work_root_path}}/pip-8.1.2"
+   - "{{node_work_root_path}}/pip-8.1.2.tar.gz"
+   - "{{node_work_root_path}}/setuptools-28.6.0.tar.gz"
+  when: result_pip | failed
+
+
+- name: "Install docker py supervisor"
+  pip:
+    name: docker-py
+    state: present
+    executable: pip
+    extra_args: "{{ pip_extra_args }}"
+  with_items:
+   - docker-py
+
+
+- name: "Confirm supervisor was installed for Debian"
+  apt: name=supervisor state=latest
+
+
+- name: Copy k8s cni network plugin
+  copy: src=./cni/bin/ dest={{node_work_root_path}}/kubernetes/cni/bin owner=root group=root mode=0655
+
+
+# TODO it's for temp used
+- name: "Copy required image"
+  copy: src=./images/{{item}} dest={{node_work_root_path}}/kubernetes/images/{{item}} owner=root group=root mode=0655
+  with_items: "{{IMAGE_TAR}}"
+
+# config kubelet supervisor
+- name: "Config supervisor"
+  template: src=./master/supervisor/kubelet.conf.j2 dest={{node_work_root_path}}/kubernetes/supervisor/kubelet.conf owner=root mode=777 backup=no
+
+
+- name: "Add kubelet supervisor config to default for Ubuntu"
+  ini_file:  dest=/etc/supervisor/supervisord.conf section=include option=files value={{node_work_root_path}}/kubernetes/supervisor/*.conf
+
+- include: 'docker_ubuntu_install.yml'
+  when: result | failed
+
+- name: "Confirm docker is started"
+  service: name=docker state=started
+
+- name: "Load docker images"
+  shell: docker load -i {{node_work_root_path}}/kubernetes/images/{{item}}
+  with_items: "{{IMAGE_TAR}}"
+
+# for single image pull status show
+- name: "Pulling flannel image"
+  docker_image:
+    name: "{{flannel_image_name}}"
+
+- name: "Pulling etcd image"
+  docker_image:
+    name: "{{etcd_image_name}}"
+
+- name: "Pulling apiserver image"
+  docker_image:
+    name: "{{kube_apiserver_image_name}}"
+
+- name: "Pulling controller manager image"
+  docker_image:
+    name: "{{kube_controller_manager_image_name}}"
+
+- name: "Pulling scheduler image"
+  docker_image:
+    name: "{{kube_scheduler_image_name}}"
+
+- name: "Pulling proxy image"
+  docker_image:
+    name: "{{kube_proxy_image_name}}"
+
+- name: "Pulling kubedens image"
+  docker_image:
+    name: "{{kubedens_image_name}}"
+
+- name: "Pulling dnsmasq image"
+  docker_image:
+    name: "{{dnsmasq_image_name}}"
+
+- name: "Pulling exechealthz image"
+  docker_image:
+    name: "{{exechealthz_image_name}}"
+
+- name: "Create kubelet dir if not exists"
+  file: path={{node_work_root_path}}/kubernetes state=directory
+
+- name: "Copy kubelet file"
+  copy: src=kubelet dest={{node_work_root_path}}/kubernetes/kubelet owner=root group=root mode=0655
+
+- name: "Copy kubectl file"
+  copy: src=kubectl dest=/usr/local/bin/kubectl owner=root group=root mode=0655
+
+- name: "Config kubelet"
+  shell: echo "Config kubelet"
+
+- name: "Config kubelet config file"
+  template: src=./master/config/authentication/kubelet.conf.j2 dest={{node_work_root_path}}/kubernetes/config/kubelet.conf owner=root mode=777 backup=no
+
+- name: "Create keys ca.key"
+  command: openssl genrsa -out {{node_work_root_path}}/kubernetes/pki/ca.key 2048
+- name: "Create keys ca.crt"
+  command: openssl req -x509 -new -nodes -key {{node_work_root_path}}/kubernetes/pki/ca.key -subj "/CN={{kubernetes_ca_crt_CN}}" -days 10000 -out {{node_work_root_path}}/kubernetes/pki/ca.crt
+- name: "Create keys server.key"
+  command: openssl genrsa -out {{node_work_root_path}}/kubernetes/pki/server.key 2048
+- name: "Create keys server.csr"
+  command: openssl req -new -key {{node_work_root_path}}/kubernetes/pki/server.key -subj "/CN={{inventory_hostname}}" -out {{node_work_root_path}}/kubernetes/pki/server.csr
+- name: "Create keys server.crt"
+  command: openssl x509 -req -in {{node_work_root_path}}/kubernetes/pki/server.csr -CA {{node_work_root_path}}/kubernetes/pki/ca.crt -CAkey {{node_work_root_path}}/kubernetes/pki/ca.key -CAcreateserial -out {{node_work_root_path}}/kubernetes/pki/server.crt -days 10000
+- name: "Create token csv file"
+  shell: "echo '{{kubernetes_cluster_default_token}},{{kubernetes_cluster_default_user}},{{kubernetes_cluster_default_uid}},{{kubernetes_cluster_default_group}}' >{{node_work_root_path}}/kubernetes/pki/tokens.csv"
+
+- name: "Config kubelet manifests"
+  template: src=./master/manifests/authentication/{{item.name}} dest={{node_work_root_path}}/kubernetes/manifests/{{item.value}} owner=root mode=777 backup=no
+  with_items:
+   - {name: "etcd.json.j2", value: "etcd.json"}
+   - {name: "kube-apiserver.json.j2", value: "kube-apiserver.json"}
+   - {name: "kube-controller-manager.json.j2", value: "kube-controller-manager.json"}
+   - {name: "kube-scheduler.json.j2", value: "kube-scheduler.json"}
+   - {name: "kube-proxy.json.j2", value: "kube-proxy.json"}
+   - {name: "flannel.yaml.j2", value: "flannel.yaml"}
+
+- name: "Config kubelet addons"
+  template: src=./master/addons/{{item.name}} dest={{node_work_root_path}}/kubernetes/addons/{{item.value}} owner=root mode=777 backup=no
+  with_items:
+   - {name: "dns/1.4.1/authentication/skydns-rc.yaml.j2", value: "dns/skydns-rc.yaml"}
+   - {name: "dns/1.4.1/authentication/skydns-svc.yaml.j2", value: "dns/skydns-svc.yaml"}
+   - {name: "dashboard/authentication/dashboard-controller.yaml.j2", value: "dashboard/dashboard-controller.yaml"}
+   - {name: "dashboard/authentication/dashboard-service.yaml.j2", value: "dashboard/dashboard-service.yaml"}
+   - {name: "calico/calico.yaml.j2", value: "calico/calico.yaml"}
+
+- name: "Ignore error check kubelet is running"
+  shell: ps aux |grep kubelet |grep -v grep
+  ignore_errors: yes
+  changed_when: false
+  register: kubelet_service
+
+- name: "Kill kubelet if already running"
+  shell: kill -9 $(ps aux |grep kubelet |grep -v grep | awk '{print $2}')
+  when: kubelet_service | success
+
+- name: "Restart supervisorctl and auto start kubelet"
+  supervisorctl: name=kubelet state=restarted
+
+- name: "Waitting for kubelet 30 seconds..."
+  shell: sleep 30
+
+- name: "Ignore error remove if exit docker and flannel network"
+  shell: "{{item}}"
+  with_items:
+   - "ip link delete flannel.1"
+   - "ip link delete docker0"
+  ignore_errors: True
+
+- name: "Install curl"
+  apt: name=curl state=present
+  ignore_errors: True
+
+- name: "Config flannel etcd config"
+  shell: "curl -L {{etcd_servers}}/v2/keys{{flannel_etcd_prefix}}/config -XPUT -d value='{{flannel_network_config}}'"
+
+- name: "Waitting for flannel config 10 seconds..."
+  shell: sleep 10
+
+- name: "Config flannel docker ops"
+  shell: docker run --rm --net=host --privileged -v {{node_work_root_path}}/kubernetes/run:{{node_work_root_path}}/kubernetes/run {{flannel_image_name}} /opt/bin/mk-docker-opts.sh -f {{node_work_root_path}}/kubernetes/run/subnet.env -d {{node_work_root_path}}/kubernetes/run/docker_opts.env
+
+- name: "Config docker ops for ubuntu"
+  lineinfile: dest=/etc/default/docker create=yes line="{{item.line}}"
+  with_items:
+   - {line: ". {{node_work_root_path}}/kubernetes/run/subnet.env"}
+   - {line: "DOCKER_OPTS=\"--bip=${FLANNEL_SUBNET} --mtu=${FLANNEL_MTU}\""}
+
+- name: "Restart docker service"
+  service: name=docker state=restarted
+
+- name: "Waitting for kubernetes component starting 60 second"
+  shell: sleep 60
+
+- name: "Config dns and k8s dashboard"
+  shell: kubectl create -f {{node_work_root_path}}/kubernetes/addons/{{item}}
+  with_items:
+   - "dns/skydns-rc.yaml"
+   - "dns/skydns-svc.yaml"
+   - "dashboard/dashboard-controller.yaml"
+   - "dashboard/dashboard-service.yaml"
+
+- name: "Done"
+  debug: msg="Done"

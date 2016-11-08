@@ -1,0 +1,13 @@
+[program:kubelet]
+command={{node_work_root_path}}/kubernetes/kubelet --kubeconfig={{node_work_root_path}}/kubernetes/config/kubelet.conf --require-kubeconfig=true --pod-manifest-path={{node_work_root_path}}/kubernetes/manifests --allow-privileged=true --cluster-dns={{cluster_dns}} --hostname-override={{inventory_hostname}} --cluster-domain={{cluster_domain}} --v=4
+autostart=true
+autorestart=true
+startsecs=5
+startretries=10
+stdout_logfile_maxbytes=10MB
+stdout_logfile_backups=10
+redirect_stderr=true
+stdout_logfile=/var/log/kubelet-node.log
+stopsignal=INT
+[supervisord]
+;--network-plugin=cni --cni-conf-dir=/etc/cni/net.d --cni-bin-dir=/usr/local/anynode/kubernetes/cni/bin
