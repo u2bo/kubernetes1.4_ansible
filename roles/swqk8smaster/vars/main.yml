@@ -10,7 +10,7 @@ kube_apiserver_image_name: swqmaven/kube-apiserver-amd64:v1.4.1
 kube_controller_manager_image_name: swqmaven/kube-controller-manager-amd64:v1.4.1
 kube_scheduler_image_name: swqmaven/kube-scheduler-amd64:v1.4.1
 kube_proxy_image_name: swqmaven/kube-proxy-amd64:v1.4.1
-flannel_image_name: quay.io/coreos/flannel:v0.6.2-amd64
+flannel_image_name: swqmaven/flannel:v0.6.2-amd64
 kubedens_image_name: swqmaven/kubedns-amd64:1.8
 dnsmasq_image_name: swqmaven/kube-dnsmasq-amd64:1.4
 exechealthz_image_name: swqmaven/exechealthz-amd64:1.2
