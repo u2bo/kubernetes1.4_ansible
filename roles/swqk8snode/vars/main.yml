@@ -5,6 +5,7 @@ node_work_root_path: /usr/local/swqmaven
 pip_extra_args:  -i http://pypi.douban.com/simple --trusted-host pypi.douban.com
 #used images
 IMAGE_TAR: ['kube-proxy.tar','flannel.tar','pause-amd64.tar']
+pod_infra_container_image_name: gcr.io/google_containers/pause-amd64:3.0
 etcd_image_name: swqmaven/etcd-amd64:2.2.5
 kube_apiserver_image_name: swqmaven/kube-apiserver-amd64:v1.4.1
 kube_controller_manager_image_name: swqmaven/kube-controller-manager-amd64:v1.4.1

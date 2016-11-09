@@ -1,5 +1,5 @@
 [program:kubelet]
-command={{node_work_root_path}}/kubernetes/kubelet --kubeconfig={{node_work_root_path}}/kubernetes/config/kubelet.conf --require-kubeconfig=true --pod-manifest-path={{node_work_root_path}}/kubernetes/manifests --allow-privileged=true --cluster-dns={{cluster_dns}} --hostname-override={{inventory_hostname}} --cluster-domain={{cluster_domain}} --v=4
+command={{node_work_root_path}}/kubernetes/kubelet --kubeconfig={{node_work_root_path}}/kubernetes/config/kubelet.conf --require-kubeconfig=true --pod-manifest-path={{node_work_root_path}}/kubernetes/manifests --allow-privileged=true --cluster-dns={{cluster_dns}} --hostname-override={{inventory_hostname}} --pod-infra-container-image={{pod_infra_container_image_name}} --cluster-domain={{cluster_domain}} --v=4
 autostart=true
 autorestart=true
 startsecs=5
