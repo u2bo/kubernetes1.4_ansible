@@ -145,6 +145,7 @@ Requirements
 
 Role Variables
 --------------
+      pod_infra_container_image_name: gcr.io/google_containers/pause-amd64:3.0
       etcd_image_name: gcr.io/google_containers/etcd-amd64:2.2.5
       kube_apiserver_image_name: gcr.io/google_containers/kube-apiserver-amd64:v1.4.1
       kube_controller_manager_image_name: gcr.io/google_containers/kube-controller-manager-amd64:v1.4.1
